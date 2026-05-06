@@ -1,5 +1,4 @@
-# ============================================================
-# COMBINED PIPELINE (paste-and-run) -
+# COMBINED PIPELINE
 #   1) Frequentist "old methodology": mblogit month FE (+ optional covars) + institute RE
 #   2) Bayesian "new methodology": brms Dirichlet–Multinomial with spline time + method + institute RE
 #   3) Plots for BOTH:
@@ -9,7 +8,6 @@
 # Dataset: valasztasok_vegso.xlsx
 # Folder:  C:/Users/molna/Documents/KUTATÁSOK/2_Választás_bayesi_minta/Új bayesi
 # Output:  ./plots
-# ============================================================
 suppressPackageStartupMessages({
   library(readxl)
   library(dplyr)
@@ -24,18 +22,15 @@ suppressPackageStartupMessages({
   library(patchwork)
 })
 
-# ---- set your working directory (keep yours) ----
+#set your working directory
 setwd("C:/Users/molna/Documents/KUTATÁSOK/2_Választás_bayesi_minta/Új bayesi")
 
-# ---- output folder ----
 dir.create("plots", showWarnings = FALSE)
 
 theme_pub <- theme_minimal(base_size = 12) +
   theme(panel.grid.minor = element_blank(), legend.position = "bottom")
 
-# ============================================================
-# 0) Shared helpers
-# ============================================================
+#0) Shared helpers
 hun_date <- function(x){
   x <- as.character(x)
   x <- str_trim(x)
@@ -122,9 +117,7 @@ largest_remainder_counts <- function(p, N){
   as.integer(base)
 }
 
-# ============================================================
 # 1) Load + common cleaning (done ONCE)
-# ============================================================
 df <- read_excel("valasztasok_vegso_tisztitott.xlsx") %>%
   rename(institute = `Intézet`, date_end = `Felmérés vége`) %>%
   mutate(date = hun_date(date_end), institute = as.factor(institute)) %>%
@@ -175,10 +168,7 @@ df <- df %>%
 # safe institute levels once
 df$institute <- safe_levels(as.factor(df$institute))
 
-# ============================================================
-# 2) FREQUENTIST BLOCK (mblogit "old methodology")
-# ============================================================
-message("\n=============================\nFREQUENTIST (mblogit) FIT\n=============================")
+# 2) FREQUENTIST BLOCK
 
 df_f <- df %>% mutate(month = factor(format(date, "%Y-%m")))
 
@@ -261,10 +251,7 @@ if (is.null(fit_freq)) stop("mblogit failed in all configurations.")
 message("mblogit converged using: ", fit_label)
 print(summary(fit_freq))
 
-# ============================================================
 # 2A) Frequentist plots
-# ============================================================
-
 # (F1) Frequentist house effects: robust extraction (no fragile party filtering)
 if (grepl("random institute", fit_label)) {
   
@@ -379,10 +366,7 @@ if (!is.null(p_hat)) {
   ggsave("plots/F_02_time_trends_empirical.pdf", pF_time, width = 10, height = 7)
 }
 
-# ============================================================
-# 3) BAYESIAN BLOCK (brms Dirichlet–Multinomial)
-# ============================================================
-message("\n=============================\nBAYESIAN (brms DM) FIT\n=============================")
+# 3) BAYESIAN BLOCK 
 
 df_b <- df %>%
   mutate(
@@ -448,9 +432,7 @@ fit_bayes_dm <- brm(
 
 print(summary(fit_bayes_dm))
 
-# ============================================================
 # 3A) Bayesian plots
-# ============================================================
 
 # (B1) Time trends with 95% credible bands on SHARE scale
 if ("modszer" %in% names(df_counts_b)) {
@@ -610,9 +592,7 @@ print(pB_ppc)
 ggsave("plots/B_04_ppc.png", pB_ppc, width = 10, height = 6, dpi = 300)
 ggsave("plots/B_04_ppc.pdf", pB_ppc, width = 10, height = 6)
 
-# ============================================================
 # (B5) Shrinkage plot: raw (no-pooling) vs shrunk (partial-pooling) house effects
-# ============================================================
 # Observed proportions per poll
 obs_b_shares <- df_counts_b %>%
   mutate(across(all_of(party_cols), ~ .x / N_eff))
@@ -684,9 +664,7 @@ ggsave("plots/B_05_pollster_bias_shrinkage.png", pB_shrinkage,
 ggsave("plots/B_05_pollster_bias_shrinkage.pdf", pB_shrinkage,
        width = 10, height = 8)
 
-# ============================================================
 # (B6) Party-wise posterior SD of pollster house effects (sigma_u)
-# ============================================================
 # as_draws_df gives one column per sd_institute__ parameter
 sigma_draws_raw <- as_draws_df(fit_bayes_dm) %>%
   select(starts_with("sd_institute__"))
@@ -735,9 +713,7 @@ if (ncol(sigma_draws_raw) > 0) {
   message("No sd_institute__ parameters found in posterior draws; skipping B_06.")
 }
 
-# ============================================================
 # (B7) Posterior distribution of the concentration parameter phi
-# ============================================================
 phi_draws_df <- as_draws_df(fit_bayes_dm) %>%
   select(starts_with("phi"))
 plot_data_dir <- file.path("plots", "plot_data")
@@ -771,7 +747,7 @@ if (ncol(phi_draws_df) > 0) {
   ggsave("plots/B_07_phi_posterior.png", pB_phi, width = 8, height = 5, dpi = 300)
   ggsave("plots/B_07_phi_posterior.pdf", pB_phi, width = 8, height = 5)
   
-  # ---- Save B7 plot data ----
+  # Save B7 plot data
   # Full posterior draw vector (allows replotting with any bin width or quantile)
   write.csv(
     data.frame(phi = phi_vec),
@@ -794,10 +770,7 @@ if (ncol(phi_draws_df) > 0) {
   message("No phi parameter found in posterior draws; skipping B_07.")
 }
 
-# ============================================================
 # 4) SAVE ALL PLOT DATA
-# ============================================================
-message("\n=============================\nSAVING PLOT DATA\n=============================")
 
 plot_data_dir <- file.path("plots", "plot_data")
 dir.create(plot_data_dir, showWarnings = FALSE, recursive = TRUE)
@@ -871,23 +844,9 @@ message("Saved: input_bayesian_counts.csv")
 saveRDS(ep,           file.path(plot_data_dir, "B_epred_time_trends.rds"))
 message("Saved: posterior epred RDS arrays")
 
-message("\n✓ All plot data saved into: ", normalizePath(plot_data_dir))
-message("\n✓ DONE. Plots saved into: ", normalizePath("plots"))
-message("\n=============================")
-message("SUMMARY")
-message("=============================")
-message("Frequentist: 2 plots")
-message("Bayesian: 7 plots + 6 improved variance decomposition plots = 13 plots")
-message("TOTAL: 15 publication-ready plots")
-message("=============================\n")
 
-# ============================================================
 # 5) EXTENSION: PRIOR GRID SEARCH + MODEL COMPARISON
-# ============================================================
 
-message("\n=============================")
-message("EXTENSION: PRIOR GRID SEARCH")
-message("=============================")
 
 # ---- ensure loo is available ----
 if (!requireNamespace("loo", quietly = TRUE)) {
@@ -895,9 +854,7 @@ if (!requireNamespace("loo", quietly = TRUE)) {
 }
 library(loo)
 
-# ============================================================
 # 5A) PRIOR GRID
-# ============================================================
 
 prior_grid <- expand.grid(
   phi_prior = c("gamma(0.01,0.01)", "gamma(2,0.01)", "gamma(1,1)"),
@@ -1007,9 +964,7 @@ write.csv(results_df, "plots/C_01_model_comparison.csv", row.names = FALSE)
 message("\nTop models by ELPD:")
 print(head(results_df, 10))
 
-# ============================================================
 # 5E) DIAGNOSTIC PLOTS
-# ============================================================
 
 # ---- (1) ELPD ranking ----
 p_elpd <- ggplot(results_df, aes(x = reorder(model_id, elpd), y = elpd)) +
@@ -1063,9 +1018,7 @@ p_heat <- ggplot(results_df, aes(x = factor(beta_sd), y = sd_institute, fill = e
 
 ggsave("plots/C_05_performance_heatmap.png", p_heat, width = 7, height = 5, dpi = 300)
 
-# ============================================================
 # 5F) SAVE BEST MODEL
-# ============================================================
 
 best_model_id <- results_df$model_id[1]
 best_fit <- results_list[[best_model_id]]$fit
